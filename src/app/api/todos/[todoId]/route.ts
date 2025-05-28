@@ -4,12 +4,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { todoId: string } }
+  { params }: { params: Promise<{ todoId: string }> }
 ) {
   try {
     const { userId } = await auth();
     const body = await req.json();
     const { completed } = body;
+    const { todoId } = await params;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -17,7 +18,7 @@ export async function PATCH(
 
     const todo = await prisma.todo.update({
       where: {
-        id: params.todoId,
+        id: todoId,
         userId,
       },
       data: {
@@ -34,10 +35,11 @@ export async function PATCH(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { todoId: string } }
+  { params }: { params: Promise<{ todoId: string }> }
 ) {
   try {
     const { userId } = await auth();
+    const { todoId } = await params;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -45,7 +47,7 @@ export async function DELETE(
 
     await prisma.todo.delete({
       where: {
-        id: params.todoId,
+        id: todoId,
         userId,
       },
     });
@@ -55,4 +57,4 @@ export async function DELETE(
     console.error("[TODOS_DELETE]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
-} 
+}
