@@ -20,6 +20,7 @@ export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     fetchTodos();
@@ -39,9 +40,10 @@ export default function TodoList() {
   };
 
   const addTodo = async () => {
-    if (!newTodo.trim()) return;
+    if (!newTodo.trim() || isAdding) return;
 
     try {
+      setIsAdding(true);
       const response = await fetch("/api/todos", {
         method: "POST",
         headers: {
@@ -60,6 +62,8 @@ export default function TodoList() {
       toast.success("新しいTodoを追加しました");
     } catch {
       toast.error("Todoの追加に失敗しました");
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -128,9 +132,12 @@ export default function TodoList() {
             value={newTodo}
             onChange={(e) => setNewTodo(e.target.value)}
             placeholder="新しいタスクを入力"
-            onKeyPress={(e) => e.key === "Enter" && addTodo()}
+            onKeyPress={(e) => e.key === "Enter" && !isAdding && addTodo()}
+            disabled={isAdding}
           />
-          <Button onClick={addTodo}>追加</Button>
+          <Button onClick={addTodo} disabled={isAdding}>
+            {isAdding ? "追加中..." : "追加"}
+          </Button>
         </div>
         <div className="space-y-6">
           <div>
