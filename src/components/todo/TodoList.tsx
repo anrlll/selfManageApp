@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 interface Todo {
   id: string;
@@ -135,8 +136,13 @@ export default function TodoList() {
             onKeyPress={(e) => e.key === "Enter" && !isAdding && addTodo()}
             disabled={isAdding}
           />
-          <Button onClick={addTodo} disabled={isAdding}>
-            {isAdding ? "追加中..." : "追加"}
+          <Button onClick={addTodo} disabled={isAdding} className="relative">
+            <span className={isAdding ? "invisible" : ""}>追加</span>
+            {isAdding && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
           </Button>
         </div>
         <div className="space-y-6">
