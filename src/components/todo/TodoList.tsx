@@ -135,8 +135,6 @@ export default function TodoList() {
           },
           body: JSON.stringify({
             todoId: active.id,
-            newOrder: newIndex,
-            oldIndex,
             newIndex,
           }),
         });

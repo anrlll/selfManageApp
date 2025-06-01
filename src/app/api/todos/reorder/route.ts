@@ -6,64 +6,46 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     const body = await req.json();
-    const { todoId, newOrder, oldIndex, newIndex } = body;
+    const { todoId, newIndex } = body;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    if (!todoId || typeof newOrder !== "number" || typeof oldIndex !== "number" || typeof newIndex !== "number") {
+    if (!todoId || typeof newIndex !== "number") {
       return new NextResponse("Invalid request", { status: 400 });
     }
 
-    // 移動するTODOの順序を更新
-    await prisma.todo.update({
+    // ユーザーの全TODOを取得
+    const todos = await prisma.todo.findMany({
       where: {
-        id: todoId,
         userId,
       },
-      data: {
-        order: newOrder,
+      orderBy: {
+        order: "desc",
       },
     });
 
-    // 他のTODOの順序も更新
-    if (oldIndex < newIndex) {
-      // 下に移動する場合
-      await prisma.todo.updateMany({
+    // 移動するTODOを取得
+    const todoToMove = todos.find(todo => todo.id === todoId);
+    if (!todoToMove) {
+      return new NextResponse("Todo not found", { status: 404 });
+    }
+
+    // 移動するTODOを配列から削除
+    const todosWithoutMoved = todos.filter(todo => todo.id !== todoId);
+
+    // 新しい位置にTODOを挿入
+    todosWithoutMoved.splice(newIndex, 0, todoToMove);
+
+    // 全TODOのorderを更新
+    for (let i = 0; i < todosWithoutMoved.length; i++) {
+      await prisma.todo.update({
         where: {
-          userId,
-          order: {
-            gt: oldIndex,
-            lte: newIndex,
-          },
-          id: {
-            not: todoId,
-          },
+          id: todosWithoutMoved[i].id,
         },
         data: {
-          order: {
-            decrement: 1,
-          },
-        },
-      });
-    } else {
-      // 上に移動する場合
-      await prisma.todo.updateMany({
-        where: {
-          userId,
-          order: {
-            gte: newIndex,
-            lt: oldIndex,
-          },
-          id: {
-            not: todoId,
-          },
-        },
-        data: {
-          order: {
-            increment: 1,
-          },
+          order: todosWithoutMoved.length - i,
         },
       });
     }
