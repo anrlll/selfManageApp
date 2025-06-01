@@ -6,7 +6,24 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Todo {
   id: string;
@@ -15,6 +32,72 @@ interface Todo {
   completed: boolean;
   createdAt: string;
   updatedAt: string;
+  order: number;
+}
+
+interface SortableTodoItemProps {
+  todo: Todo;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  deletingIds: Set<string>;
+}
+
+function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTodoItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: todo.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <Card ref={setNodeRef} style={style} className="p-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+            <GripVertical className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <Checkbox
+            checked={todo.completed}
+            onCheckedChange={() => onToggle(todo.id)}
+            className="h-5 w-5 cursor-pointer data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          />
+          <div className="flex-1">
+            <p className={`font-medium ${todo.completed ? "line-through text-muted-foreground" : ""}`}>
+              {todo.title}
+            </p>
+            {todo.description && (
+              <p className={`text-sm text-muted-foreground ${todo.completed ? "line-through" : ""}`}>
+                {todo.description}
+              </p>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => onDelete(todo.id)}
+          disabled={deletingIds.has(todo.id)}
+          className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
+        >
+          <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
+          {deletingIds.has(todo.id) && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          )}
+        </Button>
+      </div>
+    </Card>
+  );
 }
 
 export default function TodoList() {
@@ -24,16 +107,56 @@ export default function TodoList() {
   const [isAdding, setIsAdding] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   useEffect(() => {
     fetchTodos();
   }, []);
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = todos.findIndex((item) => item.id === active.id);
+      const newIndex = todos.findIndex((item) => item.id === over.id);
+      const newTodos = arrayMove(todos, oldIndex, newIndex);
+      setTodos(newTodos);
+
+      try {
+        const response = await fetch("/api/todos/reorder", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            todoId: active.id,
+            newOrder: newIndex,
+            oldIndex,
+            newIndex,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Failed to update todo order");
+      } catch {
+        toast.error("順序の更新に失敗しました");
+        // エラー時は元の順序に戻す
+        setTodos(todos);
+      }
+    }
+  };
 
   const fetchTodos = async () => {
     try {
       const response = await fetch("/api/todos");
       if (!response.ok) throw new Error("Failed to fetch todos");
       const data = await response.json();
-      setTodos(data);
+      // orderでソート
+      setTodos(data.sort((a: Todo, b: Todo) => a.order - b.order));
     } catch {
       toast.error("Todoの取得に失敗しました");
     } finally {
@@ -162,41 +285,26 @@ export default function TodoList() {
               {incompleteTodos.length === 0 ? (
                 <p className="text-muted-foreground text-sm">未完了のタスクはありません</p>
               ) : (
-                incompleteTodos.map((todo) => (
-                  <Card key={todo.id} className="p-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Checkbox
-                          checked={todo.completed}
-                          onCheckedChange={() => toggleTodo(todo.id)}
-                          className="h-5 w-5 cursor-pointer data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium">{todo.title}</p>
-                          {todo.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {todo.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteTodo(todo.id)}
-                        disabled={deletingIds.has(todo.id)}
-                        className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
-                      >
-                        <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
-                        {deletingIds.has(todo.id) && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                        )}
-                      </Button>
-                    </div>
-                  </Card>
-                ))
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={incompleteTodos.map((todo) => todo.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {incompleteTodos.map((todo) => (
+                      <SortableTodoItem
+                        key={todo.id}
+                        todo={todo}
+                        onToggle={toggleTodo}
+                        onDelete={deleteTodo}
+                        deletingIds={deletingIds}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           </div>
@@ -206,43 +314,26 @@ export default function TodoList() {
               {completedTodos.length === 0 ? (
                 <p className="text-muted-foreground text-sm">完了したタスクはありません</p>
               ) : (
-                completedTodos.map((todo) => (
-                  <Card key={todo.id} className="p-2 bg-muted/50">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Checkbox
-                          checked={todo.completed}
-                          onCheckedChange={() => toggleTodo(todo.id)}
-                          className="h-5 w-5 cursor-pointer data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                        />
-                        <div className="flex-1">
-                          <p className="font-medium line-through text-muted-foreground">
-                            {todo.title}
-                          </p>
-                          {todo.description && (
-                            <p className="text-sm text-muted-foreground line-through">
-                              {todo.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteTodo(todo.id)}
-                        disabled={deletingIds.has(todo.id)}
-                        className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
-                      >
-                        <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
-                        {deletingIds.has(todo.id) && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                        )}
-                      </Button>
-                    </div>
-                  </Card>
-                ))
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={completedTodos.map((todo) => todo.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {completedTodos.map((todo) => (
+                      <SortableTodoItem
+                        key={todo.id}
+                        todo={todo}
+                        onToggle={toggleTodo}
+                        onDelete={deleteTodo}
+                        deletingIds={deletingIds}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
           </div>

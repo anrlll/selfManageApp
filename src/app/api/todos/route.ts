@@ -40,11 +40,22 @@ export async function POST(req: Request) {
       return new NextResponse("Title is required", { status: 400 });
     }
 
+    // 最大のorder値を取得
+    const maxOrderTodo = await prisma.todo.findFirst({
+      where: {
+        userId,
+      },
+      orderBy: {
+        order: 'desc',
+      },
+    });
+
     const todo = await prisma.todo.create({
       data: {
         title,
         description,
         userId,
+        order: (maxOrderTodo?.order ?? -1) + 1,
       },
     });
 
