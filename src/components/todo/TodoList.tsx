@@ -155,8 +155,8 @@ export default function TodoList() {
       const response = await fetch("/api/todos");
       if (!response.ok) throw new Error("Failed to fetch todos");
       const data = await response.json();
-      // orderでソート
-      setTodos(data.sort((a: Todo, b: Todo) => a.order - b.order));
+      // orderでソート（降順）
+      setTodos(data.sort((a: Todo, b: Todo) => b.order - a.order));
     } catch {
       toast.error("Todoの取得に失敗しました");
     } finally {

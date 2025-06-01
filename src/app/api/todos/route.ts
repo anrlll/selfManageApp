@@ -15,7 +15,7 @@ export async function GET() {
         userId,
       },
       orderBy: {
-        createdAt: "desc",
+        order: "desc",
       },
     });
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         title,
         description,
         userId,
-        order: (maxOrderTodo?.order ?? -1) + 1,
+        order: (maxOrderTodo?.order ?? 0) + 1,
       },
     });
 
