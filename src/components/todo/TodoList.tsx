@@ -22,6 +22,7 @@ export default function TodoList() {
   const [newTodo, setNewTodo] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTodos();
@@ -92,7 +93,10 @@ export default function TodoList() {
   };
 
   const deleteTodo = async (id: string) => {
+    if (deletingIds.has(id)) return;
+
     try {
+      setDeletingIds(prev => new Set([...prev, id]));
       const response = await fetch(`/api/todos/${id}`, {
         method: "DELETE",
       });
@@ -103,6 +107,12 @@ export default function TodoList() {
       toast.success("Todoを削除しました");
     } catch {
       toast.error("Todoの削除に失敗しました");
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
   };
 
@@ -174,9 +184,15 @@ export default function TodoList() {
                         variant="destructive"
                         size="sm"
                         onClick={() => deleteTodo(todo.id)}
-                        className="cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
+                        disabled={deletingIds.has(todo.id)}
+                        className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
                       >
-                        削除
+                        <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
+                        {deletingIds.has(todo.id) && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        )}
                       </Button>
                     </div>
                   </Card>
@@ -214,9 +230,15 @@ export default function TodoList() {
                         variant="destructive"
                         size="sm"
                         onClick={() => deleteTodo(todo.id)}
-                        className="cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
+                        disabled={deletingIds.has(todo.id)}
+                        className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
                       >
-                        削除
+                        <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
+                        {deletingIds.has(todo.id) && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        )}
                       </Button>
                     </div>
                   </Card>
