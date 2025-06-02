@@ -86,7 +86,7 @@ function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTod
           size="sm"
           onClick={() => onDelete(todo.id)}
           disabled={deletingIds.has(todo.id)}
-          className="relative cursor-pointer hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
+          className="relative hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
         >
           <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
           {deletingIds.has(todo.id) && (
