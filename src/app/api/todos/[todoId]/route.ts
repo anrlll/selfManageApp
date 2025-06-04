@@ -9,7 +9,7 @@ export async function PATCH(
   try {
     const { userId } = await auth();
     const body = await req.json();
-    const { completed } = body;
+    const { completed, title } = body;
     const { todoId } = await params;
 
     if (!userId) {
@@ -22,7 +22,8 @@ export async function PATCH(
         userId,
       },
       data: {
-        completed,
+        ...(completed !== undefined && { completed }),
+        ...(title !== undefined && { title }),
       },
     });
 

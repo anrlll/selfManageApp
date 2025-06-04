@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, GripVertical } from "lucide-react";
+import { Loader2, GripVertical, Pencil, Check, X } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -39,10 +39,14 @@ interface SortableTodoItemProps {
   todo: Todo;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit: (id: string, title: string) => void;
   deletingIds: Set<string>;
 }
 
-function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTodoItemProps) {
+function SortableTodoItem({ todo, onToggle, onDelete, onEdit, deletingIds }: SortableTodoItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(todo.title);
+
   const {
     attributes,
     listeners,
@@ -58,8 +62,22 @@ function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTod
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleEdit = () => {
+    if (editTitle.trim() === "") {
+      toast.error("タイトルを入力してください");
+      return;
+    }
+    onEdit(todo.id, editTitle);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditTitle(todo.title);
+    setIsEditing(false);
+  };
+
   return (
-    <Card ref={setNodeRef} style={style} className="p-2">
+    <Card ref={setNodeRef} style={style} className="p-2 group">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1">
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
@@ -71,9 +89,42 @@ function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTod
             className="h-5 w-5 cursor-pointer data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           />
           <div className="flex-1">
-            <p className={`font-medium ${todo.completed ? "line-through text-muted-foreground" : ""}`}>
-              {todo.title}
-            </p>
+            {isEditing ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleEdit();
+                    if (e.key === "Escape") handleCancel();
+                  }}
+                  className="h-8"
+                  autoFocus
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleEdit}
+                  className="h-8 w-8 p-0"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancel}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className={`font-medium ${todo.completed ? "line-through text-muted-foreground" : ""}`}>
+                  {todo.title}
+                </p>
+              </div>
+            )}
             {todo.description && (
               <p className={`text-sm text-muted-foreground ${todo.completed ? "line-through" : ""}`}>
                 {todo.description}
@@ -81,20 +132,30 @@ function SortableTodoItem({ todo, onToggle, onDelete, deletingIds }: SortableTod
             )}
           </div>
         </div>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => onDelete(todo.id)}
-          disabled={deletingIds.has(todo.id)}
-          className="relative hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
-        >
-          <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
-          {deletingIds.has(todo.id) && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="h-4 w-4 animate-spin" />
-            </div>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsEditing(true)}
+            className="h-8 w-8 p-0"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => onDelete(todo.id)}
+            disabled={deletingIds.has(todo.id)}
+            className="relative hover:bg-destructive/90 active:scale-95 active:bg-destructive/80 transition-all"
+          >
+            <span className={deletingIds.has(todo.id) ? "invisible" : ""}>削除</span>
+            {deletingIds.has(todo.id) && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
+          </Button>
+        </div>
       </div>
     </Card>
   );
@@ -237,6 +298,30 @@ export default function TodoList() {
     }
   };
 
+  const editTodo = async (id: string, title: string) => {
+    try {
+      const response = await fetch(`/api/todos/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update todo");
+
+      const updatedTodo = await response.json();
+      setTodos(
+        todos.map((todo) => (todo.id === id ? updatedTodo : todo))
+      );
+      toast.success("タスクを更新しました");
+    } catch {
+      toast.error("タスクの更新に失敗しました");
+    }
+  };
+
   const incompleteTodos = todos.filter((todo) => !todo.completed);
   const completedTodos = todos.filter((todo) => todo.completed);
 
@@ -298,6 +383,7 @@ export default function TodoList() {
                         todo={todo}
                         onToggle={toggleTodo}
                         onDelete={deleteTodo}
+                        onEdit={editTodo}
                         deletingIds={deletingIds}
                       />
                     ))}
@@ -327,6 +413,7 @@ export default function TodoList() {
                         todo={todo}
                         onToggle={toggleTodo}
                         onDelete={deleteTodo}
+                        onEdit={editTodo}
                         deletingIds={deletingIds}
                       />
                     ))}
