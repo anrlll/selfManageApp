@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,6 +24,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Todo {
   id: string;
@@ -33,6 +34,7 @@ interface Todo {
   createdAt: string;
   updatedAt: string;
   order: number;
+  type: string;
 }
 
 interface SortableTodoItemProps {
@@ -161,13 +163,20 @@ function SortableTodoItem({ todo, onToggle, onDelete, onEdit, deletingIds }: Sor
   );
 }
 
-export default function TodoList() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [newTodo, setNewTodo] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdding, setIsAdding] = useState(false);
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+interface TodoListProps {
+  title: string;
+  todos: Todo[];
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onEdit: (id: string, title: string) => void;
+  onAdd: (title: string) => void;
+  onDragEnd: (event: DragEndEvent) => void;
+  deletingIds: Set<string>;
+  isAdding: boolean;
+}
 
+function TodoListSection({ title, todos, onToggle, onDelete, onEdit, onAdd, onDragEnd, deletingIds, isAdding }: TodoListProps) {
+  const [newTodo, setNewTodo] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -175,9 +184,128 @@ export default function TodoList() {
     })
   );
 
+  const incompleteTodos = todos.filter((todo) => !todo.completed);
+  const completedTodos = todos.filter((todo) => todo.completed);
+
+  const handleAddTodo = () => {
+    if (!newTodo.trim() || isAdding) return;
+    onAdd(newTodo);
+    setNewTodo("");
+  };
+
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex gap-2 mb-4">
+          <Input
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            placeholder="新しいタスクを入力"
+            onKeyPress={(e) => e.key === "Enter" && !isAdding && handleAddTodo()}
+            disabled={isAdding}
+          />
+          <Button onClick={handleAddTodo} disabled={isAdding} className="relative">
+            <span className={isAdding ? "invisible" : ""}>追加</span>
+            {isAdding && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </div>
+            )}
+          </Button>
+        </div>
+        
+        <div>
+          <h3 className="text-lg font-semibold mb-2">未完了のタスク</h3>
+          <div className="space-y-2">
+            {incompleteTodos.length === 0 ? (
+              <p className="text-muted-foreground text-sm">未完了のタスクはありません</p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+              >
+                <SortableContext
+                  items={incompleteTodos.map((todo) => todo.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {incompleteTodos.map((todo) => (
+                    <SortableTodoItem
+                      key={todo.id}
+                      todo={todo}
+                      onToggle={onToggle}
+                      onDelete={onDelete}
+                      onEdit={onEdit}
+                      deletingIds={deletingIds}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </div>
+        
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-2">完了したタスク</h3>
+          <div className="space-y-2">
+            {completedTodos.length === 0 ? (
+              <p className="text-muted-foreground text-sm">完了したタスクはありません</p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+              >
+                <SortableContext
+                  items={completedTodos.map((todo) => todo.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {completedTodos.map((todo) => (
+                    <SortableTodoItem
+                      key={todo.id}
+                      todo={todo}
+                      onToggle={onToggle}
+                      onDelete={onDelete}
+                      onEdit={onEdit}
+                      deletingIds={deletingIds}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function TodoList() {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState("daily");
+
+  const fetchTodos = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/todos?type=${activeTab}`);
+      if (!response.ok) throw new Error("Failed to fetch todos");
+      const data = await response.json();
+      setTodos(data.sort((a: Todo, b: Todo) => b.order - a.order));
+    } catch {
+      toast.error("Todoの取得に失敗しました");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab]);
+
   useEffect(() => {
     fetchTodos();
-  }, []);
+  }, [fetchTodos]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -203,28 +331,13 @@ export default function TodoList() {
         if (!response.ok) throw new Error("Failed to update todo order");
       } catch {
         toast.error("順序の更新に失敗しました");
-        // エラー時は元の順序に戻す
         setTodos(todos);
       }
     }
   };
 
-  const fetchTodos = async () => {
-    try {
-      const response = await fetch("/api/todos");
-      if (!response.ok) throw new Error("Failed to fetch todos");
-      const data = await response.json();
-      // orderでソート（降順）
-      setTodos(data.sort((a: Todo, b: Todo) => b.order - a.order));
-    } catch {
-      toast.error("Todoの取得に失敗しました");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const addTodo = async () => {
-    if (!newTodo.trim() || isAdding) return;
+  const addTodo = async (title: string) => {
+    if (!title.trim() || isAdding) return;
 
     try {
       setIsAdding(true);
@@ -234,7 +347,8 @@ export default function TodoList() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title: newTodo,
+          title,
+          type: activeTab,
         }),
       });
 
@@ -242,7 +356,6 @@ export default function TodoList() {
 
       const newTodoItem = await response.json();
       setTodos([newTodoItem, ...todos]);
-      setNewTodo("");
       toast.success("新しいTodoを追加しました");
     } catch {
       toast.error("Todoの追加に失敗しました");
@@ -322,9 +435,6 @@ export default function TodoList() {
     }
   };
 
-  const incompleteTodos = todos.filter((todo) => !todo.completed);
-  const completedTodos = todos.filter((todo) => todo.completed);
-
   if (isLoading) {
     return (
       <Card className="w-full max-w-2xl mx-auto">
@@ -339,91 +449,53 @@ export default function TodoList() {
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>Todoリスト</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex gap-2 mb-4">
-          <Input
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="新しいタスクを入力"
-            onKeyPress={(e) => e.key === "Enter" && !isAdding && addTodo()}
-            disabled={isAdding}
+    <div className="w-full max-w-6xl mx-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="daily">デイタスク</TabsTrigger>
+          <TabsTrigger value="implementation">実装タスク</TabsTrigger>
+          <TabsTrigger value="long-term">長期タスク</TabsTrigger>
+        </TabsList>
+        <TabsContent value="daily">
+          <TodoListSection
+            title="デイタスクリスト"
+            todos={todos}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+            onEdit={editTodo}
+            onAdd={addTodo}
+            onDragEnd={handleDragEnd}
+            deletingIds={deletingIds}
+            isAdding={isAdding}
           />
-          <Button onClick={addTodo} disabled={isAdding} className="relative">
-            <span className={isAdding ? "invisible" : ""}>追加</span>
-            {isAdding && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-            )}
-          </Button>
-        </div>
-        <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">未完了のタスク</h3>
-            <div className="space-y-2">
-              {incompleteTodos.length === 0 ? (
-                <p className="text-muted-foreground text-sm">未完了のタスクはありません</p>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={incompleteTodos.map((todo) => todo.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {incompleteTodos.map((todo) => (
-                      <SortableTodoItem
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={toggleTodo}
-                        onDelete={deleteTodo}
-                        onEdit={editTodo}
-                        deletingIds={deletingIds}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              )}
-            </div>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold mb-2">完了したタスク</h3>
-            <div className="space-y-2">
-              {completedTodos.length === 0 ? (
-                <p className="text-muted-foreground text-sm">完了したタスクはありません</p>
-              ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <SortableContext
-                    items={completedTodos.map((todo) => todo.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    {completedTodos.map((todo) => (
-                      <SortableTodoItem
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={toggleTodo}
-                        onDelete={deleteTodo}
-                        onEdit={editTodo}
-                        deletingIds={deletingIds}
-                      />
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </TabsContent>
+        <TabsContent value="implementation">
+          <TodoListSection
+            title="実装タスクリスト"
+            todos={todos}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+            onEdit={editTodo}
+            onAdd={addTodo}
+            onDragEnd={handleDragEnd}
+            deletingIds={deletingIds}
+            isAdding={isAdding}
+          />
+        </TabsContent>
+        <TabsContent value="long-term">
+          <TodoListSection
+            title="長期タスクリスト"
+            todos={todos}
+            onToggle={toggleTodo}
+            onDelete={deleteTodo}
+            onEdit={editTodo}
+            onAdd={addTodo}
+            onDragEnd={handleDragEnd}
+            deletingIds={deletingIds}
+            isAdding={isAdding}
+          />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 } 

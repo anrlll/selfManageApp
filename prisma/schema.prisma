@@ -16,4 +16,5 @@ model Todo {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   userId      String
+  type        String   @default("daily") // "daily", "implementation", "long-term"
 }
