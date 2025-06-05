@@ -2,9 +2,11 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const { userId } = await auth();
+    const { searchParams } = new URL(req.url);
+    const type = searchParams.get("type");
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -13,6 +15,7 @@ export async function GET() {
     const todos = await prisma.todo.findMany({
       where: {
         userId,
+        ...(type && { type }),
       },
       orderBy: {
         order: "desc",
@@ -30,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     const body = await req.json();
-    const { title, description } = body;
+    const { title, description, type = "daily" } = body;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -44,6 +47,7 @@ export async function POST(req: Request) {
     const maxOrderTodo = await prisma.todo.findFirst({
       where: {
         userId,
+        type,
       },
       orderBy: {
         order: 'desc',
@@ -55,6 +59,7 @@ export async function POST(req: Request) {
         title,
         description,
         userId,
+        type,
         order: (maxOrderTodo?.order ?? 0) + 1,
       },
     });
