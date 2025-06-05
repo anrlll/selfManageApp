@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -290,11 +290,7 @@ export default function TodoList() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("daily");
 
-  useEffect(() => {
-    fetchTodos();
-  }, [activeTab]);
-
-  const fetchTodos = async () => {
+  const fetchTodos = useCallback(async () => {
     try {
       const response = await fetch(`/api/todos?type=${activeTab}`);
       if (!response.ok) throw new Error("Failed to fetch todos");
@@ -305,7 +301,11 @@ export default function TodoList() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeTab]);
+
+  useEffect(() => {
+    fetchTodos();
+  }, [fetchTodos]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
