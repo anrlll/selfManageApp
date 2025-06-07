@@ -6,20 +6,21 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     const body = await req.json();
-    const { todoId, newIndex } = body;
+    const { todoId, newIndex, category } = body;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    if (!todoId || typeof newIndex !== "number") {
+    if (!todoId || typeof newIndex !== "number" || !category) {
       return new NextResponse("Invalid request", { status: 400 });
     }
 
-    // ユーザーの全TODOを取得
+    // ユーザーの全TODOを取得（カテゴリーでフィルタリング）
     const todos = await prisma.todo.findMany({
       where: {
         userId,
+        category,
       },
       orderBy: {
         order: "desc",

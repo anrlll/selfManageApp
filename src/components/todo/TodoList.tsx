@@ -325,6 +325,7 @@ export default function TodoList() {
           body: JSON.stringify({
             todoId: active.id,
             newIndex,
+            category: activeTab,
           }),
         });
 
