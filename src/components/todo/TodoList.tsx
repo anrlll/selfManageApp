@@ -34,7 +34,7 @@ interface Todo {
   createdAt: string;
   updatedAt: string;
   order: number;
-  type: string;
+  category: string;
 }
 
 interface SortableTodoItemProps {
@@ -292,7 +292,7 @@ export default function TodoList() {
 
   const fetchTodos = useCallback(async () => {
     try {
-      const response = await fetch(`/api/todos?type=${activeTab}`);
+      const response = await fetch(`/api/todos?category=${activeTab}`);
       if (!response.ok) throw new Error("Failed to fetch todos");
       const data = await response.json();
       setTodos(data.sort((a: Todo, b: Todo) => b.order - a.order));
@@ -348,7 +348,7 @@ export default function TodoList() {
         },
         body: JSON.stringify({
           title,
-          type: activeTab,
+          category: activeTab,
         }),
       });
 

@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   try {
     const { userId } = await auth();
     const { searchParams } = new URL(req.url);
-    const type = searchParams.get("type");
+    const category = searchParams.get("category");
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const todos = await prisma.todo.findMany({
       where: {
         userId,
-        ...(type && { type }),
+        category: category || "daily"
       },
       orderBy: {
         order: "desc",
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   try {
     const { userId } = await auth();
     const body = await req.json();
-    const { title, description, type = "daily" } = body;
+    const { title, description, category = "daily" } = body;
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     const maxOrderTodo = await prisma.todo.findFirst({
       where: {
         userId,
-        type,
+        category,
       },
       orderBy: {
         order: 'desc',
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         title,
         description,
         userId,
-        type,
+        category,
         order: (maxOrderTodo?.order ?? 0) + 1,
       },
     });
