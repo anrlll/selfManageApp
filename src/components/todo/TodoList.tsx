@@ -289,9 +289,11 @@ export default function TodoList() {
   const [isAdding, setIsAdding] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState("daily");
+  const [isTabLoading, setIsTabLoading] = useState(false);
 
   const fetchTodos = useCallback(async () => {
     try {
+      setIsTabLoading(true);
       const response = await fetch(`/api/todos?category=${activeTab}`);
       if (!response.ok) throw new Error("Failed to fetch todos");
       const data = await response.json();
@@ -300,6 +302,7 @@ export default function TodoList() {
       toast.error("Todoの取得に失敗しました");
     } finally {
       setIsLoading(false);
+      setIsTabLoading(false);
     }
   }, [activeTab]);
 
@@ -443,7 +446,9 @@ export default function TodoList() {
           <CardTitle>Todoリスト</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center">読み込み中...</div>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -458,43 +463,61 @@ export default function TodoList() {
           <TabsTrigger value="long-term">長期タスク</TabsTrigger>
         </TabsList>
         <TabsContent value="daily">
-          <TodoListSection
-            title="デイタスクリスト"
-            todos={todos}
-            onToggle={toggleTodo}
-            onDelete={deleteTodo}
-            onEdit={editTodo}
-            onAdd={addTodo}
-            onDragEnd={handleDragEnd}
-            deletingIds={deletingIds}
-            isAdding={isAdding}
-          />
+          {isTabLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <TodoListSection
+              title="デイタスクリスト"
+              todos={todos}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+              onEdit={editTodo}
+              onAdd={addTodo}
+              onDragEnd={handleDragEnd}
+              deletingIds={deletingIds}
+              isAdding={isAdding}
+            />
+          )}
         </TabsContent>
         <TabsContent value="implementation">
-          <TodoListSection
-            title="実装タスクリスト"
-            todos={todos}
-            onToggle={toggleTodo}
-            onDelete={deleteTodo}
-            onEdit={editTodo}
-            onAdd={addTodo}
-            onDragEnd={handleDragEnd}
-            deletingIds={deletingIds}
-            isAdding={isAdding}
-          />
+          {isTabLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <TodoListSection
+              title="実装タスクリスト"
+              todos={todos}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+              onEdit={editTodo}
+              onAdd={addTodo}
+              onDragEnd={handleDragEnd}
+              deletingIds={deletingIds}
+              isAdding={isAdding}
+            />
+          )}
         </TabsContent>
         <TabsContent value="long-term">
-          <TodoListSection
-            title="長期タスクリスト"
-            todos={todos}
-            onToggle={toggleTodo}
-            onDelete={deleteTodo}
-            onEdit={editTodo}
-            onAdd={addTodo}
-            onDragEnd={handleDragEnd}
-            deletingIds={deletingIds}
-            isAdding={isAdding}
-          />
+          {isTabLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <TodoListSection
+              title="長期タスクリスト"
+              todos={todos}
+              onToggle={toggleTodo}
+              onDelete={deleteTodo}
+              onEdit={editTodo}
+              onAdd={addTodo}
+              onDragEnd={handleDragEnd}
+              deletingIds={deletingIds}
+              isAdding={isAdding}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
